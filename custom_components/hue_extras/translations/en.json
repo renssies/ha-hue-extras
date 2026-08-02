@@ -9,5 +9,60 @@
     "abort": {
       "already_configured": "Hue Extras is already set up."
     }
+  },
+  "exceptions": {
+    "no_properties": {
+      "message": "Specify at least one property to change (brightness, color temperature or color)."
+    },
+    "no_hue_lights": {
+      "message": "No Hue lights were found in the selected target. This action only works on lights from the core Philips Hue integration."
+    },
+    "invalid_color_name": {
+      "message": "Unknown color name: {name}."
+    }
+  },
+  "services": {
+    "change_light": {
+      "name": "Change light",
+      "description": "Changes brightness, color or color temperature of Philips Hue lights without changing their on/off state. If a light is off it stays off; the new values apply the next time it turns on. Fields match light.turn_on, so this is a drop-in replacement.",
+      "fields": {
+        "transition": {
+          "name": "Transition",
+          "description": "Duration, in seconds, over which to fade to the new values."
+        },
+        "rgb_color": {
+          "name": "Color",
+          "description": "Color in RGB format. A list of three integers, each 0-255."
+        },
+        "color_temp_kelvin": {
+          "name": "Color temperature",
+          "description": "White color temperature in Kelvin."
+        },
+        "brightness": {
+          "name": "Brightness",
+          "description": "Brightness, 0-255. Takes precedence over brightness (%)."
+        },
+        "brightness_pct": {
+          "name": "Brightness",
+          "description": "Brightness in percent, 0-100."
+        },
+        "color_temp": {
+          "name": "Color temperature (mireds)",
+          "description": "White color temperature in mireds. Converted to Kelvin."
+        },
+        "hs_color": {
+          "name": "Color (hue, saturation)",
+          "description": "Color in hue/saturation format. Hue 0-360, saturation 0-100."
+        },
+        "xy_color": {
+          "name": "XY-color",
+          "description": "Color in XY format. A list of two floats between 0 and 1."
+        },
+        "color_name": {
+          "name": "Color name",
+          "description": "A human-readable CSS color name, e.g. tomato."
+        }
+      }
+    }
   }
 }

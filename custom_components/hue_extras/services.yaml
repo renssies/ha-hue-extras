@@ -1,19 +1,94 @@
-# Actions (services) exposed by Hue Extras.
-example_action:
-  name: Example action
-  description: >-
-    Placeholder action. Replace with a real Hue Extras action.
+# The change_light action. Fields mirror light.turn_on (names, selectors and
+# capability filters) so it is a drop-in replacement. The `filter` blocks hide
+# fields that don't apply to the selected light, exactly like light.turn_on.
+change_light:
+  # Exactly the same target picker as light.turn_on: a single light entity, a
+  # device, an area, a label, or a light group. Non-Hue targets are filtered out
+  # by the action handler.
+  target:
+    entity:
+      domain: light
   fields:
-    target:
-      name: Target
-      description: The target Hue resource (light, group, scene, ...).
-      required: true
-      example: "light.living_room"
+    transition:
+      filter:
+        supported_features:
+          - light.LightEntityFeature.TRANSITION
       selector:
-        text:
-    value:
-      name: Value
-      description: An optional value passed to the action.
-      required: false
+        number:
+          min: 0
+          max: 300
+          unit_of_measurement: seconds
+    rgb_color:
+      filter: &color_support
+        attribute:
+          supported_color_modes:
+            - light.ColorMode.HS
+            - light.ColorMode.XY
+            - light.ColorMode.RGB
+            - light.ColorMode.RGBW
+            - light.ColorMode.RGBWW
+      example: "[255, 100, 100]"
+      selector:
+        color_rgb:
+    color_temp_kelvin:
+      filter: &color_temp_support
+        attribute:
+          supported_color_modes:
+            - light.ColorMode.COLOR_TEMP
+            - light.ColorMode.HS
+            - light.ColorMode.XY
+            - light.ColorMode.RGB
+            - light.ColorMode.RGBW
+            - light.ColorMode.RGBWW
+      selector:
+        color_temp:
+          unit: kelvin
+          min: 2000
+          max: 6500
+    brightness:
+      filter: &brightness_support
+        attribute:
+          supported_color_modes:
+            - light.ColorMode.BRIGHTNESS
+            - light.ColorMode.COLOR_TEMP
+            - light.ColorMode.HS
+            - light.ColorMode.XY
+            - light.ColorMode.RGB
+            - light.ColorMode.RGBW
+            - light.ColorMode.RGBWW
+      selector:
+        number:
+          min: 0
+          max: 255
+    brightness_pct:
+      filter: *brightness_support
+      selector:
+        number:
+          min: 0
+          max: 100
+          unit_of_measurement: "%"
+    color_temp:
+      filter: *color_temp_support
+      advanced: true
+      selector:
+        color_temp:
+          unit: mired
+          min: 153
+          max: 500
+    hs_color:
+      filter: *color_support
+      advanced: true
+      example: "[300, 70]"
+      selector:
+        object:
+    xy_color:
+      filter: *color_support
+      advanced: true
+      example: "[0.52, 0.43]"
+      selector:
+        object:
+    color_name:
+      filter: *color_support
+      advanced: true
       selector:
         text:
