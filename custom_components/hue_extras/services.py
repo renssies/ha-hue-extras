@@ -520,8 +520,12 @@ async def _async_start_signaling(call: ServiceCall) -> None:
 
 
 async def _async_stop_signaling(call: ServiceCall) -> None:
-    """Handle ``hue_extras.stop_signaling`` (stops any active signal)."""
-    await _run_signal(call, Signal(SIGNAL_NO_SIGNAL), None, None)
+    """Handle ``hue_extras.stop_signaling`` (stops any active signal).
+
+    The Hue bridge requires a ``duration`` to be present even for ``no_signal``
+    (it is dropped from the request when ``None``), so send an explicit 0.
+    """
+    await _run_signal(call, Signal(SIGNAL_NO_SIGNAL), 0, None)
 
 
 def async_register_services(hass: HomeAssistant) -> None:
