@@ -13,7 +13,7 @@ DOMAIN = "hue_extras"
 # The core Philips Hue integration domain we hook into.
 HUE_DOMAIN = "hue"
 
-PLATFORMS: list[Platform] = [Platform.SWITCH]
+PLATFORMS: list[Platform] = [Platform.LIGHT]
 
 # Service names exposed by this integration (see services.yaml).
 SERVICE_CHANGE_LIGHT = "change_light"

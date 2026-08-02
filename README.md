@@ -32,6 +32,18 @@ How it works: v2 lights are driven via the CLIP `set_state` call with the `on`
 field omitted; v1 lights via a state command without `on`. Hue has no
 white/RGBW channel, so those `light.turn_on` fields are intentionally absent.
 
+## Entities
+
+### "All lights" (per Hue **v2** bridge)
+
+A light entity — named **`<Bridge name> All lights`** and shown under the Hue
+bridge device — that turns **every light connected to that bridge** on or off.
+
+It drives the bridge's `bridge_home` grouped_light resource via the Hue v2 API,
+which the core Hue integration intentionally does not expose. It's an on/off
+light (no brightness/color). One entity is created per loaded v2 bridge; legacy
+v1 bridges are not supported for this entity.
+
 ## Installation (HACS custom repository)
 
 1. In HACS → *Integrations* → ⋮ → **Custom repositories**, add this repo's URL
