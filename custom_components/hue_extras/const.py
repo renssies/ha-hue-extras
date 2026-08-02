@@ -17,9 +17,10 @@ PLATFORMS: list[Platform] = [Platform.LIGHT]
 
 # Service names exposed by this integration (see services.yaml).
 SERVICE_CHANGE_LIGHT = "change_light"
-SERVICE_SIGNAL = "signal"
+SERVICE_START_SIGNALING = "start_signaling"
+SERVICE_STOP_SIGNALING = "stop_signaling"
 
-# signal action field names.
+# signaling action field names.
 ATTR_SIGNAL = "signal"
 ATTR_DURATION = "duration"
 ATTR_COLOR = "color"
@@ -30,7 +31,8 @@ SIGNAL_NO_SIGNAL = "no_signal"
 SIGNAL_ON_OFF = "on_off"
 SIGNAL_ON_OFF_COLOR = "on_off_color"
 SIGNAL_ALTERNATING = "alternating"
-SIGNALS = [SIGNAL_ON_OFF, SIGNAL_ON_OFF_COLOR, SIGNAL_ALTERNATING, SIGNAL_NO_SIGNAL]
+# Signals offered by start_signaling (no_signal is handled by stop_signaling).
+START_SIGNALS = [SIGNAL_ON_OFF, SIGNAL_ON_OFF_COLOR, SIGNAL_ALTERNATING]
 
 # Service field names — identical to light.turn_on so this action is a drop-in
 # replacement (same data keys work).

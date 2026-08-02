@@ -70,12 +70,14 @@ from .const import (
     DOMAIN,
     LOGGER,
     SERVICE_CHANGE_LIGHT,
-    SERVICE_SIGNAL,
+    SERVICE_START_SIGNALING,
+    SERVICE_STOP_SIGNALING,
     SIGNAL_ALTERNATING,
     SIGNAL_NO_SIGNAL,
     SIGNAL_ON_OFF_COLOR,
-    SIGNALS,
+    START_SIGNALS,
 )
+from .light import HueAllLightsLight
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant, ServiceCall
@@ -353,10 +355,10 @@ _MAX_SIGNAL_DURATION_SEC = 65534
 _MAX_SIGNAL_DURATION_MS = 65534000
 _DEFAULT_SIGNAL_DURATION_SEC = 10
 
-SIGNAL_SCHEMA = vol.Schema(
+START_SIGNALING_SCHEMA = vol.Schema(
     {
         **cv.ENTITY_SERVICE_FIELDS,
-        vol.Required(ATTR_SIGNAL): vol.In(SIGNALS),
+        vol.Required(ATTR_SIGNAL): vol.In(START_SIGNALS),
         vol.Optional(ATTR_DURATION, default=_DEFAULT_SIGNAL_DURATION_SEC): vol.All(
             vol.Coerce(float), vol.Range(min=0, max=_MAX_SIGNAL_DURATION_SEC)
         ),
@@ -365,10 +367,12 @@ SIGNAL_SCHEMA = vol.Schema(
     }
 )
 
+STOP_SIGNALING_SCHEMA = cv.make_entity_service_schema({})
+
 
 def _resolve_hue_signalable(
     hass: HomeAssistant, entity_id: str
-) -> HueLightV2 | GroupedHueLight | None:
+) -> HueLightV2 | GroupedHueLight | HueAllLightsLight | None:
     """Return the live Hue v2 light or grouped light for an entity id, or None."""
     component: EntityComponent | None = hass.data.get(DATA_INSTANCES, {}).get(
         LIGHT_DOMAIN
@@ -376,21 +380,21 @@ def _resolve_hue_signalable(
     if component is None:
         return None
     entity = component.get_entity(entity_id)
-    if isinstance(entity, (HueLightV2, GroupedHueLight)):
+    if isinstance(entity, (HueLightV2, GroupedHueLight, HueAllLightsLight)):
         return entity
     return None
 
 
 def _collect_signalables(
     hass: HomeAssistant, entity_ids: set[str]
-) -> dict[str, HueLightV2 | GroupedHueLight]:
+) -> dict[str, HueLightV2 | GroupedHueLight | HueAllLightsLight]:
     """Resolve targets to signalable Hue resources.
 
     A Hue grouped light (room/zone) is signalled directly as a group. Anything
     that is not a Hue light but exposes members (an HA light group) is expanded
     to its members, which are then resolved individually.
     """
-    result: dict[str, HueLightV2 | GroupedHueLight] = {}
+    result: dict[str, HueLightV2 | GroupedHueLight | HueAllLightsLight] = {}
     seen: set[str] = set()
     stack = list(entity_ids)
     while stack:
@@ -432,15 +436,24 @@ def _signal_colors(signal: str, data: dict[str, Any]) -> list[ColorFeaturePut] |
 
 
 async def _apply_signal(
-    entity: HueLightV2 | GroupedHueLight,
+    entity: HueLightV2 | GroupedHueLight | HueAllLightsLight,
     signal: Signal,
     duration_ms: int | None,
     colors: list[ColorFeaturePut] | None,
 ) -> bool:
     """Send a signal to a Hue light/grouped light. Returns False if unsupported."""
     signaling = getattr(entity.resource, "signaling", None)
-    if signaling is None or signal not in (signaling.signal_values or []):
-        # The light doesn't advertise support for this signal.
+    if signaling is None:
+        # The light has no signaling feature at all.
+        return False
+    # no_signal (stop) is always allowed when signaling is supported. For the
+    # active signals, honour the advertised signal_values when the light lists
+    # them; an empty list is treated as "unknown" and attempted.
+    if (
+        signal is not Signal.NO_SIGNAL
+        and signaling.signal_values
+        and signal not in signaling.signal_values
+    ):
         return False
 
     put_cls = LightPut if isinstance(entity, HueLightV2) else GroupedLightPut
@@ -455,18 +468,14 @@ async def _apply_signal(
     return True
 
 
-async def _async_signal(call: ServiceCall) -> None:
-    """Handle the ``hue_extras.signal`` service call."""
+async def _run_signal(
+    call: ServiceCall,
+    signal: Signal,
+    duration_ms: int | None,
+    colors: list[ColorFeaturePut] | None,
+) -> None:
+    """Resolve the target and apply a signal to every Hue light in it."""
     hass = call.hass
-    signal_str: str = call.data[ATTR_SIGNAL]
-    signal = Signal(signal_str)
-    duration_ms = (
-        None
-        if signal_str == SIGNAL_NO_SIGNAL
-        else min(int(call.data[ATTR_DURATION] * 1000), _MAX_SIGNAL_DURATION_MS)
-    )
-    colors = _signal_colors(signal_str, call.data)
-
     selected = async_extract_referenced_entity_ids(hass, TargetSelection(call.data))
     lights = _collect_signalables(
         hass, selected.referenced | selected.indirectly_referenced
@@ -477,24 +486,42 @@ async def _async_signal(call: ServiceCall) -> None:
         )
 
     results = await asyncio.gather(
-        *(_apply_signal(entity, signal, duration_ms, colors) for entity in lights.values()),
+        *(
+            _apply_signal(entity, signal, duration_ms, colors)
+            for entity in lights.values()
+        ),
         return_exceptions=True,
     )
 
     errors: list[str] = []
     for (entity_id, _entity), result in zip(lights.items(), results, strict=True):
         if isinstance(result, Exception):
-            LOGGER.error("Signal failed on %s: %s", entity_id, result)
+            LOGGER.error("Signaling failed on %s: %s", entity_id, result)
             errors.append(entity_id)
         elif result is False:
             LOGGER.warning(
-                "%s does not support the '%s' signal; skipped", entity_id, signal_str
+                "%s does not support the '%s' signal; skipped",
+                entity_id,
+                signal.value,
             )
         else:
-            LOGGER.debug("Signal '%s' sent to %s", signal_str, entity_id)
+            LOGGER.debug("Signal '%s' applied to %s", signal.value, entity_id)
 
     if errors:
-        raise HomeAssistantError(f"Signal failed on: {', '.join(sorted(errors))}")
+        raise HomeAssistantError(f"Signaling failed on: {', '.join(sorted(errors))}")
+
+
+async def _async_start_signaling(call: ServiceCall) -> None:
+    """Handle ``hue_extras.start_signaling``."""
+    signal_str: str = call.data[ATTR_SIGNAL]
+    duration_ms = min(int(call.data[ATTR_DURATION] * 1000), _MAX_SIGNAL_DURATION_MS)
+    colors = _signal_colors(signal_str, call.data)
+    await _run_signal(call, Signal(signal_str), duration_ms, colors)
+
+
+async def _async_stop_signaling(call: ServiceCall) -> None:
+    """Handle ``hue_extras.stop_signaling`` (stops any active signal)."""
+    await _run_signal(call, Signal(SIGNAL_NO_SIGNAL), None, None)
 
 
 def async_register_services(hass: HomeAssistant) -> None:
@@ -510,13 +537,20 @@ def async_register_services(hass: HomeAssistant) -> None:
     )
     hass.services.async_register(
         DOMAIN,
-        SERVICE_SIGNAL,
-        _async_signal,
-        schema=SIGNAL_SCHEMA,
+        SERVICE_START_SIGNALING,
+        _async_start_signaling,
+        schema=START_SIGNALING_SCHEMA,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_STOP_SIGNALING,
+        _async_stop_signaling,
+        schema=STOP_SIGNALING_SCHEMA,
     )
 
 
 def async_unregister_services(hass: HomeAssistant) -> None:
     """Remove all Hue Extras services."""
     hass.services.async_remove(DOMAIN, SERVICE_CHANGE_LIGHT)
-    hass.services.async_remove(DOMAIN, SERVICE_SIGNAL)
+    hass.services.async_remove(DOMAIN, SERVICE_START_SIGNALING)
+    hass.services.async_remove(DOMAIN, SERVICE_STOP_SIGNALING)

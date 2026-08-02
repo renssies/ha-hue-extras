@@ -32,25 +32,30 @@ How it works: v2 lights are driven via the CLIP `set_state` call with the `on`
 field omitted; v1 lights via a state command without `on`. Hue has no
 white/RGBW channel, so those `light.turn_on` fields are intentionally absent.
 
-### `hue_extras.signal`
+### `hue_extras.start_signaling` / `hue_extras.stop_signaling`
 
-Triggers the **Hue v2 signaling API** on single lights **and Hue grouped lights**
-(rooms/zones). Signalling is the modern replacement for the old alert/breathe
-flash and can blink or alternate colors for a set duration.
+Drives the **Hue v2 signaling API** (the modern replacement for the old
+alert/breathe flash) on single lights, Hue **grouped lights** (rooms/zones), and
+the **All lights** bridge entity.
 
-- **Signals:** `on_off` (blink in the current color), `on_off_color` (blink in
-  `color`), `alternating` (alternate between `color` and `color2`), and
-  `no_signal` (stop an active signal).
-- `duration` in seconds (ignored for `no_signal`). `color` / `color2` are RGB.
-- **Targets** single lights and Hue **grouped lights** directly (a targeted
-  room/zone is signalled as a group, not expanded). HA light groups are expanded
-  to their members. Lights that don't advertise support for the signal are
-  skipped.
+**`start_signaling`** fields:
 
-Example — alternate red/blue on a room for 30 seconds:
+- `signal`: **On off** (blink in the current color), **On off color** (blink in
+  `color`), or **Alternating** (alternate between `color` and `color2`).
+- `duration`: seconds.
+- `color` / `color2`: RGB (required by On off color / Alternating).
+
+**`stop_signaling`** takes only a target and stops any active signal.
+
+Both target single lights and Hue **grouped lights** directly (a targeted
+room/zone or the *All lights* entity is signalled as a group, not expanded); HA
+light groups are expanded to their members. Lights that don't advertise support
+for the signal are skipped.
+
+Example — alternate red/blue on a room for 30 seconds, then stop:
 
 ```yaml
-action: hue_extras.signal
+action: hue_extras.start_signaling
 target:
   entity: light.living_room     # a Hue room/zone grouped light
 data:
@@ -58,6 +63,12 @@ data:
   duration: 30
   color: [255, 0, 0]
   color2: [0, 0, 255]
+```
+
+```yaml
+action: hue_extras.stop_signaling
+target:
+  entity: light.living_room
 ```
 
 How it works: sends a `SignalingFeaturePut` via the Hue v2 CLIP API using each
@@ -73,8 +84,11 @@ bridge device — that turns **every light connected to that bridge** on or off.
 
 It drives the bridge's `bridge_home` grouped_light resource via the Hue v2 API,
 which the core Hue integration intentionally does not expose. It's an on/off
-light (no brightness/color). One entity is created per loaded v2 bridge; legacy
-v1 bridges are not supported for this entity.
+light (no brightness/color) but, like the core Hue grouped lights, it exposes
+`is_hue_group`, `lights`, and `entity_id` (its member lights) attributes and can
+be targeted by **`start_signaling`** / **`stop_signaling`**. One entity is
+created per loaded v2 bridge; legacy v1 bridges are not supported for this
+entity.
 
 ## Installation (HACS custom repository)
 

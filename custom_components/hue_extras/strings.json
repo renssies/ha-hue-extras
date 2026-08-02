@@ -70,26 +70,39 @@
         }
       }
     },
-    "signal": {
-      "name": "Signal",
-      "description": "Triggers the Hue v2 signaling API on single lights and Hue grouped lights (rooms/zones).",
+    "start_signaling": {
+      "name": "Start signaling",
+      "description": "Starts the Hue v2 signaling API on single lights and Hue grouped lights (rooms/zones, and the bridge's All lights entity).",
       "fields": {
         "signal": {
           "name": "Signal",
-          "description": "The signal: on_off (blink in current color), on_off_color (blink in the given color), alternating (alternate between two colors), or no_signal (stop)."
+          "description": "The signal to run: blink in the current color, blink in a color, or alternate between two colors."
         },
         "duration": {
           "name": "Duration",
-          "description": "How long the signal runs, in seconds. Ignored for no_signal."
+          "description": "How long the signal runs, in seconds."
         },
         "color": {
           "name": "Color",
-          "description": "Color for on_off_color, and the first color for alternating."
+          "description": "Color for On off color, and the first color for Alternating."
         },
         "color2": {
           "name": "Color 2",
-          "description": "The second color for the alternating signal."
+          "description": "The second color for the Alternating signal."
         }
+      }
+    },
+    "stop_signaling": {
+      "name": "Stop signaling",
+      "description": "Stops any active signal on the targeted lights and grouped lights."
+    }
+  },
+  "selector": {
+    "signal": {
+      "options": {
+        "on_off": "On off",
+        "on_off_color": "On off color",
+        "alternating": "Alternating"
       }
     }
   }
