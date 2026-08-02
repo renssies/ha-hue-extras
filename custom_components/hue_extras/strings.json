@@ -19,6 +19,12 @@
     },
     "invalid_color_name": {
       "message": "Unknown color name: {name}."
+    },
+    "signal_needs_color": {
+      "message": "The 'on_off_color' signal requires a color."
+    },
+    "signal_needs_two_colors": {
+      "message": "The 'alternating' signal requires both color and color 2."
     }
   },
   "services": {
@@ -61,6 +67,28 @@
         "color_name": {
           "name": "Color name",
           "description": "A human-readable CSS color name, e.g. tomato."
+        }
+      }
+    },
+    "signal": {
+      "name": "Signal",
+      "description": "Triggers the Hue v2 signaling API on single lights and Hue grouped lights (rooms/zones).",
+      "fields": {
+        "signal": {
+          "name": "Signal",
+          "description": "The signal: on_off (blink in current color), on_off_color (blink in the given color), alternating (alternate between two colors), or no_signal (stop)."
+        },
+        "duration": {
+          "name": "Duration",
+          "description": "How long the signal runs, in seconds. Ignored for no_signal."
+        },
+        "color": {
+          "name": "Color",
+          "description": "Color for on_off_color, and the first color for alternating."
+        },
+        "color2": {
+          "name": "Color 2",
+          "description": "The second color for the alternating signal."
         }
       }
     }

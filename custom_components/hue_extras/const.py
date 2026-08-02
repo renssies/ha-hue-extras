@@ -17,6 +17,20 @@ PLATFORMS: list[Platform] = [Platform.LIGHT]
 
 # Service names exposed by this integration (see services.yaml).
 SERVICE_CHANGE_LIGHT = "change_light"
+SERVICE_SIGNAL = "signal"
+
+# signal action field names.
+ATTR_SIGNAL = "signal"
+ATTR_DURATION = "duration"
+ATTR_COLOR = "color"
+ATTR_COLOR2 = "color2"
+
+# Hue v2 signal types.
+SIGNAL_NO_SIGNAL = "no_signal"
+SIGNAL_ON_OFF = "on_off"
+SIGNAL_ON_OFF_COLOR = "on_off_color"
+SIGNAL_ALTERNATING = "alternating"
+SIGNALS = [SIGNAL_ON_OFF, SIGNAL_ON_OFF_COLOR, SIGNAL_ALTERNATING, SIGNAL_NO_SIGNAL]
 
 # Service field names — identical to light.turn_on so this action is a drop-in
 # replacement (same data keys work).

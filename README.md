@@ -32,6 +32,38 @@ How it works: v2 lights are driven via the CLIP `set_state` call with the `on`
 field omitted; v1 lights via a state command without `on`. Hue has no
 white/RGBW channel, so those `light.turn_on` fields are intentionally absent.
 
+### `hue_extras.signal`
+
+Triggers the **Hue v2 signaling API** on single lights **and Hue grouped lights**
+(rooms/zones). Signalling is the modern replacement for the old alert/breathe
+flash and can blink or alternate colors for a set duration.
+
+- **Signals:** `on_off` (blink in the current color), `on_off_color` (blink in
+  `color`), `alternating` (alternate between `color` and `color2`), and
+  `no_signal` (stop an active signal).
+- `duration` in seconds (ignored for `no_signal`). `color` / `color2` are RGB.
+- **Targets** single lights and Hue **grouped lights** directly (a targeted
+  room/zone is signalled as a group, not expanded). HA light groups are expanded
+  to their members. Lights that don't advertise support for the signal are
+  skipped.
+
+Example — alternate red/blue on a room for 30 seconds:
+
+```yaml
+action: hue_extras.signal
+target:
+  entity: light.living_room     # a Hue room/zone grouped light
+data:
+  signal: alternating
+  duration: 30
+  color: [255, 0, 0]
+  color2: [0, 0, 255]
+```
+
+How it works: sends a `SignalingFeaturePut` via the Hue v2 CLIP API using each
+resource's own controller (`LightPut` for lights, `GroupedLightPut` for grouped
+lights). Hue v2 only.
+
 ## Entities
 
 ### "All lights" (per Hue **v2** bridge)

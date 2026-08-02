@@ -92,3 +92,38 @@ change_light:
       advanced: true
       selector:
         text:
+
+# Trigger the Hue v2 signaling API on single lights and/or Hue grouped lights
+# (rooms/zones). "on_off" blinks in the current color, "on_off_color" blinks in
+# `color`, "alternating" alternates between `color` and `color2`, and
+# "no_signal" stops an active signal.
+signal:
+  target:
+    entity:
+      domain: light
+  fields:
+    signal:
+      required: true
+      example: on_off
+      selector:
+        select:
+          options:
+            - on_off
+            - on_off_color
+            - alternating
+            - no_signal
+    duration:
+      example: 10
+      selector:
+        number:
+          min: 0
+          max: 65534
+          unit_of_measurement: seconds
+    color:
+      example: "[255, 0, 0]"
+      selector:
+        color_rgb:
+    color2:
+      example: "[0, 0, 255]"
+      selector:
+        color_rgb:
