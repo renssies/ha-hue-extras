@@ -1,0 +1,13 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Hue Extras",
+        "description": "Add the Hue Extras actions and entities to Home Assistant. No configuration is required."
+      }
+    },
+    "abort": {
+      "already_configured": "Hue Extras is already set up."
+    }
+  }
+}

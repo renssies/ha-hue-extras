@@ -1,0 +1,19 @@
+# Actions (services) exposed by Hue Extras.
+example_action:
+  name: Example action
+  description: >-
+    Placeholder action. Replace with a real Hue Extras action.
+  fields:
+    target:
+      name: Target
+      description: The target Hue resource (light, group, scene, ...).
+      required: true
+      example: "light.living_room"
+      selector:
+        text:
+    value:
+      name: Value
+      description: An optional value passed to the action.
+      required: false
+      selector:
+        text:
