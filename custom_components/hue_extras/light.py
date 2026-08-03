@@ -1,24 +1,25 @@
 """Light platform for Hue Extras.
 
-Exposes an "All lights" light entity per Philips Hue **v2** bridge that turns
-every light connected to that bridge on or off. It drives the bridge's
-``bridge_home`` grouped_light resource, which the core Hue integration
-deliberately does not expose as an entity.
+Exposes an "All lights" light entity per Philips Hue **v2** bridge that controls
+every light connected to that bridge. It drives the bridge's ``bridge_home``
+grouped_light resource (which the core Hue integration does not expose) and
+reuses the core ``GroupedHueLight`` so it is a full-featured grouped light:
+on/off plus brightness, color and color temperature derived from the member
+lights' capabilities.
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from types import SimpleNamespace
+from typing import TYPE_CHECKING
 
 from aiohue.v2 import HueBridgeV2
-from aiohue.v2.controllers.events import EventType
 from aiohue.v2.models.resource import ResourceTypes
 from homeassistant.components.hue.const import DOMAIN as HUE_DOMAIN
-from homeassistant.components.light import ColorMode, LightEntity
+from homeassistant.components.hue.v2.group import GroupedHueLight
+from homeassistant.components.light import LightEntityDescription
 from homeassistant.config_entries import ConfigEntry, ConfigEntryState
-from homeassistant.const import ATTR_ENTITY_ID
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.start import async_at_started
@@ -72,75 +73,31 @@ async def async_setup_entry(
     entry.async_on_unload(async_at_started(hass, _add_entities))
 
 
-class HueAllLightsLight(LightEntity):
-    """A light that switches every light on a Hue bridge on/off."""
+class HueAllLightsLight(GroupedHueLight):
+    """Full grouped light controlling every light on a Hue bridge."""
 
-    _attr_has_entity_name = True
-    _attr_name = "All lights"
-    _attr_should_poll = False
-    _attr_color_mode = ColorMode.ONOFF
-    _attr_supported_color_modes = {ColorMode.ONOFF}
+    entity_description = LightEntityDescription(
+        key="hue_all_lights",
+        has_entity_name=True,
+        name="All lights",
+    )
 
     def __init__(
         self, bridge: HueBridge, api: HueBridgeV2, resource: GroupedLight
     ) -> None:
-        """Initialize the all-lights entity."""
-        # Public bridge/controller/resource attributes mirror the core Hue
-        # entities so shared helpers (e.g. the signaling service) can treat this
-        # like any other Hue grouped light.
-        self.bridge = bridge
-        self.controller = api.groups.grouped_light
-        self.resource = resource
-        self._api = api
+        """Initialize from the bridge_home grouped_light resource."""
+        # The bridge_home group is not a Room/Zone, so provide a minimal stand-in
+        # for the `group` the core GroupedHueLight expects (only its id and type
+        # are used).
+        group = SimpleNamespace(
+            id=resource.owner.rid,
+            type=SimpleNamespace(value=ResourceTypes.BRIDGE_HOME.value),
+        )
+        super().__init__(bridge, resource, group)
+
         bridge_id = api.config.bridge_id
+        # Keep a stable unique id and attach to the Hue bridge device, so the
+        # entity shows up as "<Bridge name> All lights" (GroupedHueLight would
+        # otherwise create a separate device for the group).
         self._attr_unique_id = f"{bridge_id}_all_lights"
-        # Attach to the existing Hue bridge device so the entity is named after
-        # the bridge, e.g. "<Bridge name> All lights".
         self._attr_device_info = DeviceInfo(identifiers={(HUE_DOMAIN, bridge_id)})
-
-    @property
-    def is_on(self) -> bool:
-        """Return true if any light on the bridge is on."""
-        return self.resource.on.on
-
-    @property
-    def extra_state_attributes(self) -> dict[str, Any]:
-        """Return group-style attributes, like the core Hue grouped lights."""
-        names: list[str] = []
-        entity_ids: list[str] = []
-        ent_reg = er.async_get(self.hass)
-        for light in self.controller.get_lights(self.resource.id):
-            if (device := self.controller.get_device(light.id)) and device.metadata:
-                names.append(device.metadata.name)
-            if entity_id := ent_reg.async_get_entity_id("light", HUE_DOMAIN, light.id):
-                entity_ids.append(entity_id)
-        return {
-            "is_hue_group": True,
-            "lights": names,
-            ATTR_ENTITY_ID: entity_ids,
-        }
-
-    async def async_added_to_hass(self) -> None:
-        """Subscribe to bridge_home group updates."""
-        self.async_on_remove(
-            self.controller.subscribe(self._handle_event, self.resource.id)
-        )
-
-    @callback
-    def _handle_event(self, event_type: EventType, resource: GroupedLight) -> None:
-        """Handle a state update from the bridge."""
-        if resource is not None:
-            self.resource = resource
-        self.async_write_ha_state()
-
-    async def async_turn_on(self, **kwargs: Any) -> None:
-        """Turn all lights on the bridge on."""
-        await self.bridge.async_request_call(
-            self.controller.set_state, id=self.resource.id, on=True
-        )
-
-    async def async_turn_off(self, **kwargs: Any) -> None:
-        """Turn all lights on the bridge off."""
-        await self.bridge.async_request_call(
-            self.controller.set_state, id=self.resource.id, on=False
-        )
