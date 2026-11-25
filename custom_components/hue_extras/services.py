@@ -53,6 +53,11 @@ from homeassistant.helpers.target import (
 )
 from homeassistant.util import color as color_util
 
+try:  # Home Assistant 2026.11+: targets can carry an `exclude` block.
+    from homeassistant.helpers.target import async_extract_excluded_entity_ids
+except ImportError:  # pragma: no cover - older Home Assistant
+    async_extract_excluded_entity_ids = None
+
 from .const import (
     ATTR_BRIGHTNESS,
     ATTR_BRIGHTNESS_PCT,
@@ -213,6 +218,20 @@ def _expand_group_members(hass: HomeAssistant, entity_ids: set[str]) -> set[str]
     return resolved
 
 
+def _excluded_entity_ids(hass: HomeAssistant, selection: TargetSelection) -> set[str]:
+    """Return the entity ids a target's ``exclude`` block leaves out.
+
+    Core already removes excluded entities from the resolved target, but we
+    expand light groups ourselves afterwards, which could re-add an excluded
+    member. Excluded light groups are expanded too, so excluding a group also
+    excludes its members.
+    """
+    if async_extract_excluded_entity_ids is None:
+        return set()
+    excluded = async_extract_excluded_entity_ids(hass, selection)
+    return excluded | _expand_group_members(hass, excluded)
+
+
 def _resolve_hue_light(
     hass: HomeAssistant, entity_id: str
 ) -> HueLightV2 | HueLightV1 | None:
@@ -312,10 +331,11 @@ async def _async_change_light(call: ServiceCall) -> None:
             translation_domain=DOMAIN, translation_key="no_properties"
         )
 
-    selected = async_extract_referenced_entity_ids(hass, TargetSelection(call.data))
+    selection = TargetSelection(call.data)
+    selected = async_extract_referenced_entity_ids(hass, selection)
     entity_ids = _expand_group_members(
         hass, selected.referenced | selected.indirectly_referenced
-    )
+    ) - _excluded_entity_ids(hass, selection)
 
     lights = [
         (entity_id, entity)
@@ -476,10 +496,16 @@ async def _run_signal(
 ) -> None:
     """Resolve the target and apply a signal to every Hue light in it."""
     hass = call.hass
-    selected = async_extract_referenced_entity_ids(hass, TargetSelection(call.data))
-    lights = _collect_signalables(
-        hass, selected.referenced | selected.indirectly_referenced
-    )
+    selection = TargetSelection(call.data)
+    selected = async_extract_referenced_entity_ids(hass, selection)
+    excluded = _excluded_entity_ids(hass, selection)
+    lights = {
+        entity_id: entity
+        for entity_id, entity in _collect_signalables(
+            hass, selected.referenced | selected.indirectly_referenced
+        ).items()
+        if entity_id not in excluded
+    }
     if not lights:
         raise ServiceValidationError(
             translation_domain=DOMAIN, translation_key="no_hue_lights"
